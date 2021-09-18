@@ -32,7 +32,7 @@ WSFS_BLOCK 65535 0xABCDEF12
 
 5. Repeat steps 2, 3 and 4 until you get WSFS_EOF response
 
-Thats it! Simple, isnt it?
+Thats it! Simple, isnt it? If you still have some issues understanding this process, look at the [reference implementation](client.py)
 
 ## Commands
 ### ls
