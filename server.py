@@ -75,6 +75,55 @@ async def wsfs_connection(request):
                     continue
 
                 cwd = target
+            elif msg.data.startswith("put "):
+                file_path = " ".join(msg.data.split(" ")[1:])
+
+                if ".." in file_path or file_path.endswith("."):
+                    await ws.send_str("Path contains illegal characters")
+                    continue
+
+                sanitized_path = ""
+                if file_path.startswith("/"):
+                    sanitized_path = f"{wsfs_root}{file_path}"
+                else:
+                    sanitized_path = f"{wsfs_root}{cwd}/{file_path}"
+
+                await ws.send_str("WSFS_OK")
+
+                file = open(sanitized_path, "wb")
+
+                msg = await ws.receive()
+                if not msg.data.startswith("WSFS_FILE"):
+                    await ws.send_str("Cant find WSFS_FILE")
+                    continue
+
+                file_size = int(msg.data.split(" ")[1])
+                bytes_received = 0
+
+                while True:
+                    msg = await ws.receive()
+                    if msg.type == WSMsgType.TEXT:
+                        if msg.data == "WSFS_EOF":
+                            break
+
+                    block_data = msg.data.split(" ")
+
+                    msg = await ws.receive()
+                    if hex(zlib.crc32(msg.data)) != block_data[2]:
+                        await ws.send_str("CRC32 error")
+                        break
+
+                    file.write(msg.data)
+                    bytes_received += int(block_data[1])
+
+                if bytes_received != file_size:
+                    await ws.send_str(f"Expected {file_size} bytes but received {bytes_received} bytes")
+                    file.close()
+                    os.remove(sanitized_path)
+                    continue
+
+                await ws.send_str("WSFS_OK")
+                file.close()
             else:
                 if msg.type == WSMsgType.TEXT:
                     if ".." in msg.data or msg.data.endswith("."):
